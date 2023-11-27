@@ -17,6 +17,7 @@ run_infomax(
   maxiter = 200,
   extended = TRUE,
   whiten = c("sqrtm", "ZCA", "PCA", "ZCA-cor", "PCA-cor", "none"),
+  random_seed = NULL,
   verbose = TRUE
 )
 }
@@ -26,8 +27,12 @@ run_infomax(
 \item{centre}{Mean-centre columns before running the algorithm. Defaults to
 TRUE.}
 
-\item{pca}{A scalar. Use PCA dimensionality reduction. Often helpful when the
-data is rank deficient.}
+\item{pca}{Apply PCA decomposition. Accepts any value between 0 and
+1(exclusive), or an integer/whole number indicating the number of principal
+components to be passed for ICA decomposition.
+Values between 0 and 1 imply the percentage of variance explained by the
+selected components.
+Defaults to \code{NULL} which will result in all components being selected}
 
 \item{anneal}{Annealing rate at which learning rate reduced.}
 
@@ -47,6 +52,8 @@ length of data, whichever is smaller.}
 \item{extended}{Run extended-Infomax. Defaults to TRUE.}
 
 \item{whiten}{Whitening method to use. See notes on usage.}
+
+\item{random_seed}{Value to be passed to \code{set.seed()}. Defaults to NULL}
 
 \item{verbose}{Print informative messages for each update of the algorithm.}
 }

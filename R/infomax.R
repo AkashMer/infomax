@@ -11,8 +11,12 @@
 #' @param x matrix of data; features in columns, samples in rows.
 #' @param centre Mean-centre columns before running the algorithm. Defaults to
 #'   TRUE.
-#' @param pca A scalar. Use PCA dimensionality reduction. Often helpful when the
-#'   data is rank deficient.
+#' @param pca Apply PCA decomposition. Accepts any value between 0 and
+#' 1(exclusive), or an integer/whole number indicating the number of principal
+#' components to be passed for ICA decomposition.
+#' Values between 0 and 1 imply the percentage of variance explained by the
+#' selected components.
+#' Defaults to `NULL` which will result in all components being selected
 #' @param anneal Annealing rate at which learning rate reduced.
 #' @param annealdeg Angle at which learning rate reduced.
 #' @param tol Tolerance for convergence of ICA. Defaults to 1e-07.
@@ -23,6 +27,7 @@
 #' @param maxiter Maximum number of iterations. Defaults to 200.
 #' @param extended Run extended-Infomax. Defaults to TRUE.
 #' @param whiten Whitening method to use. See notes on usage.
+#' @param random_seed Value to be passed to `set.seed()`. Defaults to NULL
 #' @param verbose Print informative messages for each update of the algorithm.
 #' @author Matt Craddock \email{matt@@mattcraddock.com}
 #' @examples
@@ -74,7 +79,13 @@ run_infomax <- function(x,
                                    "ZCA-cor",
                                    "PCA-cor",
                                    "none"),
+                        random_seed = NULL,
                         verbose = TRUE) {
+
+  # Set the RNG seed
+  if(!is.null(random_seed)) {
+    set.seed(random_seed)
+  }
 
   x <- as.matrix(x)
   whiten <- match.arg(whiten,
@@ -108,14 +119,38 @@ run_infomax <- function(x,
 
   # 2. perform pca if necessary
   if (!is.null(pca)) {
-    pca_decomp <- eigen(stats::cov(x))
-    eigenvals <- pca_decomp$values
-    pca_decomp <- pca_decomp$vectors
+
+    # Run PCA decomposition
+    pca_decomp <- prcomp(x)
+
+    # Find the cumulative variance explained by each component
+    pca_comp_cum_var_explained <- summary(pca_decomp)$importance[3,]
+
+    # Check if number of components requested is not 0/1
+    if(pca == 0 | pca == 1) {
+      stop("Number of PCA components(pca) cannot be 0 or 1")
+    }
+
+    # Get the number of components which explain the requested variance
+    # cumulatively
+    if(pca > 0 & pca < 1) {
+      ncomp <- max(which(
+        pca_comp_cum_var_explained <= pca
+      ))
+      ncomp <- ncomp + 1
+    } else {
+      ncomp <- pca
+    }
+    message("Reducing data to ", ncomp,
+            " dimensions using PCA.")
+
+    # Apply the rotation to the data matrix
     x_o <- x
-    x <- x %*% pca_decomp[, 1:pca]
+    x <- as.matrix(x %*% pca_decomp$rotation[, 1:ncomp])
     pca_flag <- TRUE
-    ncomp <- pca
+
   } else {
+    message("No reduction in dimensions by PCA")
     pca_flag <- FALSE
     ncomp <- ncol(x)
   }
@@ -139,6 +174,7 @@ run_infomax <- function(x,
            annealdeg = annealdeg,
            annealstep = anneal,
            tol = tol,
+           random_seed = random_seed,
            verbose = verbose)
 
   unmix_mat <- crossprod(rotation_mat$weights,
@@ -189,7 +225,13 @@ ext_in <- function(x,
                    annealstep,
                    tol,
                    extended = TRUE,
+                   random_seed,
                    verbose = TRUE) {
+
+  # Set the RNG seed
+  if(!is.null(random_seed)) {
+    set.seed(random_seed)
+  }
 
   n_comps <- ncol(x)
   n_samps <- nrow(x)
